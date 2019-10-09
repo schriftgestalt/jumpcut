@@ -100,15 +100,7 @@
         [self.statusItem setImage:scissorsImage];
     }
     [self.statusItem.button setAction:@selector(statusItemClicked:)];
-    /* This detecting rightmouseup but not rightmousedown is a workaround for a NSStatusItem bug --
-     see https://www.jessesquires.com/blog/workaround-highlight-bug-nsstatusitem/; this behavior makes
-     a right click lag fractionally vs. a left click or a control-click, but prevents the status item
-     from being stuck in highlighted mode until the user clicks it again, which is worse.
-     
-     Here's a more elaborate workaround we can eventually implement:
-     https://twitter.com/danmessing/status/1162433469281996800
-     */
-    [self.statusItem.button sendActionOn:(NSLeftMouseDownMask|NSRightMouseUpMask)];
+    [self.statusItem.button sendActionOn:(NSLeftMouseDownMask|NSRightMouseDownMask)];
     
     if ([self.bezel respondsToSelector:@selector(setCollectionBehavior:)]) {
         [self.bezel setCollectionBehavior:NSWindowCollectionBehaviorTransient | NSWindowCollectionBehaviorIgnoresCycle | NSWindowCollectionBehaviorFullScreenAuxiliary | NSWindowCollectionBehaviorMoveToActiveSpace];
@@ -747,6 +739,30 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
 }
 
 /* Misc. UX */
+
+/* We are the menu delegate for our alt menu, as a workaround for an annoying UX bug
+ * involving right-clicking on NSStatusItems. See
+ https://www.jessesquires.com/blog/workaround-highlight-bug-nsstatusitem/ -- this workaround
+ was suggested here: https://twitter.com/danmessing/status/1162433469281996800.
+ 
+ If we ever need to make the app our main menu's delegate, we'll need to do some testing
+ on the sender.
+ */
+- (void)menuDidClose:(id)sender {
+    NSButton *button = self.statusItem.button;
+    NSRect buttonFrame = button.frame;
+    NSEvent *mouseEvent = [NSEvent mouseEventWithType:NSRightMouseUp
+                                             location:buttonFrame.origin
+                                        modifierFlags:0
+                                            timestamp:GetCurrentEventTime()
+                                         windowNumber:0
+                                              context:nil
+                                          eventNumber:0
+                                           clickCount:1
+                                             pressure:1];
+    [NSApp postEvent:mouseEvent atStart:NO];
+}
+
 -(IBAction)clearClippingList:(id)sender {
     NSUInteger choice;
     [NSApp activateIgnoringOtherApps:YES];
