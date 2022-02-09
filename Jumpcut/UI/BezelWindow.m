@@ -8,109 +8,40 @@
 //  This code is open-source software subject to the MIT License; see the homepage
 //  at <http://jumpcut.sourceforge.net/> for details.
 
-#define _MAXTEXTLENGTH 10000
-
 #import "BezelWindow.h"
+#import "AppDelegate.h"
 
-@implementation BezelWindow
+@implementation BezelWindow {
+    BOOL _hasSetup;
+}
 
-- (id)initWithContentRect:(NSRect)contentRect
-                styleMask:(enum NSWindowStyleMask)aStyle
-                  backing:(NSBackingStoreType)bufferingType
-                    defer:(BOOL)flag
+- (void)awakeFromNib
 {
-    self = [super initWithContentRect:contentRect
-                            styleMask:NSWindowStyleMaskBorderless
-                              backing:NSBackingStoreBuffered
-                                defer:NO];
-    if ( self )
+    if (!_hasSetup)
     {
-        [self setOpaque:NO];
-        [self setAlphaValue:1.0];
-        [self setOpaque:NO];
-        [self setHasShadow:NO];
-        [self setMovableByWindowBackground:NO];
-        [self setBackgroundColor:[self sizedBezelBackgroundWithRadius:25.0 withAlpha:.5]];
-        float lineHeight = 16;
-        NSRect textFrame = NSMakeRect(12, 12, [self frame].size.width - 24, 8 * lineHeight);
-        textField = [[RoundRecTextField alloc] initWithFrame:textFrame];
-        [[self contentView] addSubview:textField];
-        [textField setEditable:NO];
-        [textField setTextColor:[NSColor whiteColor]];
-        [textField setBackgroundColor:[NSColor colorWithCalibratedWhite:0.1 alpha:.45]];
-        [textField setDrawsBackground:YES];
-        [textField setBordered:NO];
-        [textField setAlignment:NSTextAlignmentCenter];
-        NSRect charFrame = NSMakeRect(([self frame].size.width - (2 * lineHeight)) / 2, 150, 1.75 * lineHeight, 1.75 * lineHeight);
-        charField = [[RoundRecTextField alloc] initWithFrame:charFrame];
-        [[self contentView] addSubview:charField];
-        [charField setEditable:NO];
-        [charField setTextColor:[NSColor whiteColor]];
-        [charField setBackgroundColor:[NSColor colorWithCalibratedWhite:0.1 alpha:.45]];
-        [charField setDrawsBackground:YES];
-        [charField setBordered:NO];
-        [charField setAlignment:NSTextAlignmentCenter];
-        [self setInitialFirstResponder:textField];
-        icon = [NSImage imageNamed:@"net.sf.jumpcut.ghost_scissors_small.png"];
-        if ( [icon isValid] ) {
-            NSRect iconFrame = NSMakeRect( ([self frame].size.width - [icon size].width) / 2, [self frame].size.height - [icon size].height - 24, [icon size].width, [icon size].height);
-            iconView = [[NSImageView alloc] initWithFrame:iconFrame];
-            [iconView setImage:icon];
-            [[self contentView] addSubview:iconView];
-        }
-        return self;
-    }
-    return nil;
-}
+        self.movableByWindowBackground = YES;
 
-- (void) setAlpha:(float)newValue
-{
-    //    [self setBackgroundColor:[self sizedBezelBackgroundWithRadius:25.0 withAlpha:[[NSUserDefaults standardUserDefaults] floatForKey:@"bezelAlpha"]]];
-    [self setBackgroundColor:[self sizedBezelBackgroundWithRadius:25.0 withAlpha:.5]];
-    [[self contentView] setNeedsDisplay:YES];
-}
+        NSVisualEffectView *visualEffect = [NSVisualEffectView new];
+        visualEffect.translatesAutoresizingMaskIntoConstraints = NO;
+        visualEffect.blendingMode = NSVisualEffectBlendingModeBehindWindow;
+        visualEffect.material = NSVisualEffectMaterialPopover;
 
-- (NSString *)title
-{
-    return title;
-}
+        visualEffect.state = NSVisualEffectStateActive;
+        visualEffect.wantsLayer = YES;
+        visualEffect.layer.cornerRadius = 16.0;
 
-- (void)setTitle:(NSString *)newTitle
-{
-    [newTitle retain];
-    [title release];
-    title = newTitle;
-}
+        self.backgroundColor = NSColor.clearColor;
 
-- (NSString *)text
-{
-    return bezelText;
-}
+        NSView *contentView = self.contentView;
 
-- (void)setCharString:(NSString *)newChar
-{
-    [newChar retain];
-    [charString release];
-    charString = newChar;
-    [charField setStringValue:charString];
-}
+        [contentView addSubview:visualEffect positioned:NSWindowBelow relativeTo:contentView.subviews.firstObject];
 
-- (void)setText:(NSString *)newText
-{
-    if ([newText length] > _MAXTEXTLENGTH) {
-        NSRange stringRange = {0, _MAXTEXTLENGTH};
-        stringRange = [newText rangeOfComposedCharacterSequencesForRange:stringRange];
-        newText = [newText substringWithRange:stringRange];
-    }
-    [newText retain];
-    [bezelText release];
-    bezelText = newText;
-    [textField setStringValue:bezelText];
-}
-
-- (void)setFrame:(NSRect)frameRect display:(BOOL)displayFlag animate:(BOOL)animationFlag
-{
-    [super setFrame:frameRect display:displayFlag animate:animationFlag];
+        [visualEffect.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:0].active = YES;
+        [visualEffect.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:0].active = YES;
+        [visualEffect.topAnchor constraintEqualToAnchor:contentView.topAnchor constant:0].active = YES;
+        [visualEffect.bottomAnchor constraintEqualToAnchor:contentView.bottomAnchor constant:0].active = YES;
+        _hasSetup = YES;
+    };
 }
 
 - (NSColor *)roundedBackgroundWithRect:(NSRect)bgRect withRadius:(float)radius withAlpha:(float)alpha
@@ -119,11 +50,11 @@
     [bg lockFocus];
     // I'm not at all clear why this seems to work
     NSRect dummyRect = NSMakeRect(0, 0, [bg size].width, [bg size].height);
-    NSBezierPath *roundedRec = [NSBezierPath bezierPathWithRoundRectInRect:dummyRect radius:radius];
-    [[NSColor colorWithCalibratedWhite:0.1 alpha:alpha] set];
+    NSBezierPath *roundedRec = [NSBezierPath bezierPathWithRoundedRect:dummyRect xRadius:radius yRadius:radius];
+    [[NSColor windowBackgroundColor] set];
     [roundedRec fill];
     [bg unlockFocus];
-    return [NSColor colorWithPatternImage:[bg autorelease]];
+    return [NSColor colorWithPatternImage:bg];
 }
 
 - (NSColor *)sizedBezelBackgroundWithRadius:(float)radius withAlpha:(float)alpha
@@ -131,57 +62,17 @@
     return [self roundedBackgroundWithRect:[self frame] withRadius:radius withAlpha:alpha];
 }
 
--(BOOL)canBecomeKeyWindow
+- (BOOL)canBecomeKeyWindow
 {
     return YES;
 }
 
-- (void)dealloc
+- (void)keyDown:(NSEvent *)theEvent
 {
-    [textField release];
-    [charField release];
-    [iconView release];
-    [super dealloc];
-}
-
-- (BOOL)performKeyEquivalent:(NSEvent*) theEvent
-{
-    SEL bezelKeyDownSelector = NSSelectorFromString(@"processBezelKeyDown:");
-    if ( [self delegate] )
+    if ( self.delegate )
     {
-        [delegate performSelector:bezelKeyDownSelector withObject:theEvent];
-        return YES;
+        [(AppDelegate *)self.delegate processBezelKeyDown:theEvent];
     }
-    return NO;
-}
-
-- (void)keyDown:(NSEvent *)theEvent {
-    SEL bezelKeyDownSelector = NSSelectorFromString(@"processBezelKeyDown:");
-    if ( [self delegate] )
-    {
-        [delegate performSelector:bezelKeyDownSelector withObject:theEvent];
-    }
-}
-
-- (void)flagsChanged:(NSEvent *)theEvent {
-    SEL metaKeysReleasedSelector = NSSelectorFromString(@"metaKeysReleased");
-    if ( !    ( [theEvent modifierFlags] & NSEventModifierFlagCommand )
-        && ! ( [theEvent modifierFlags] & NSEventModifierFlagOption )
-        && ! ( [theEvent modifierFlags] & NSEventModifierFlagControl )
-        && ! ( [theEvent modifierFlags] & NSEventModifierFlagShift )
-        && [ self delegate ]
-        )
-    {
-        [delegate performSelector:metaKeysReleasedSelector withObject:nil];
-    }
-}
-
-- (id)delegate {
-    return delegate;
-}
-
-- (void)setDelegate:(id)newDelegate {
-    delegate = newDelegate;
 }
 
 @end

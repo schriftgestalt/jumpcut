@@ -26,26 +26,22 @@
 
 #import "JumpcutClipping.h"
 
+#define _DISPLENGTH 50
+
 @implementation JumpcutClipping
 
 -(id) init
 {
-    [self initWithContents:@""
-                  withType:@""
-         withDisplayLength:40];
+    self = [self initWithContents:@""
+                         withType:@""];
     return self;
 }
 
--(id) initWithContents:(NSString *)contents withType:(NSString *)type withDisplayLength:(int)displayLength
+-(id) initWithContents:(NSString *)contents withType:(NSString *)type
 {
-    [super init];
-    clipContents = [[NSString alloc] init];
-    clipDisplayString = [[NSString alloc] init];
-    clipType = [[NSString alloc] init];
-
-    [self setContents:contents setDisplayLength:displayLength];
+    self = [super init];
+    [self setContents:contents];
     [self setType:type];
-    [self setHasName:false];
 
     return self;
 }
@@ -54,16 +50,16 @@
 - (id)initWithCoder:(NSCoder *)coder
 {
     NSString * newContents;
-    int newDisplayLength;
+    int newMenuLength;
     NSString *newType;
     BOOL newHasName;
     if ( self = [super init]) {
         newContents = [NSString stringWithString:[coder decodeObject]];
-        [coder decodeValueOfObjCType:@encode(int) at:&newDisplayLength];
+        [coder decodeValueOfObjCType:@encode(int) at:&newMenuLength];
         newType = [NSString stringWithString:[coder decodeObject]];
         [coder decodeValueOfObjCType:@encode(BOOL) at:&newHasName];
         [self       setContents:newContents
-                setDisplayLength:newDisplayLength];
+                setMenuLength:newMenuLength];
         [self setType:newType];
         [self setHasName:newHasName];
     }
@@ -72,124 +68,65 @@
 
 - (void)encodeWithCoder:(NSCoder *)coder
 {
-    int codeDisplayLength = [self displayLength];
+    int codeMenuLength = [self displayLength];
     BOOL codeHasName = [self hasName];
     [coder encodeObject:[self contents]];
-    [coder encodeValueOfObjCType:@encode(int) at:&codeDisplayLength];
+    [coder encodeValueOfObjCType:@encode(int) at:&codeMenuLength];
     [coder encodeObject:[self type]];
     [coder encodeValueOfObjCType:@encode(BOOL) at:&codeHasName];
 }
 */
 
--(void) setContents:(NSString *)newContents setDisplayLength:(int)newDisplayLength
+- (void) setContents:(NSString *)newContents
 {
-    id old = clipContents;
-    [newContents retain];
-    clipContents = newContents;
-    [old release];
-    if ( newDisplayLength  > 0 ) {
-        clipDisplayLength = newDisplayLength;
+    _contents = newContents;
+    [self resetDisplayStrings];
+}
+
+- (NSAttributedString *)replaceNewlinesAndTabs:(NSString *)string
+{
+    string = [string stringByReplacingOccurrencesOfString:@"\n" withString:@"\u21B5\u200B"];
+    string = [string stringByReplacingOccurrencesOfString:@"\t" withString:@"\u21E5"];
+
+    NSMutableAttributedString *menuAttributes = [[NSMutableAttributedString alloc] initWithString:string];
+    //[menuAttributes addAttribute:NSFontAttributeName value:[NSFont menuFontOfSize:13] range:NSMakeRange(0, menuAttributes.length)];
+    [menuAttributes addAttribute:NSForegroundColorAttributeName value:[NSColor labelColor] range:NSMakeRange(0, menuAttributes.length)];
+    NSCharacterSet *spechial = [NSCharacterSet characterSetWithCharactersInString:@"\u21B5\u21E5\u200B"];
+    NSRange whitespaceRange = [string rangeOfCharacterFromSet:spechial];
+    while (whitespaceRange.location < NSNotFound) {
+        [menuAttributes addAttribute:NSForegroundColorAttributeName value:[NSColor tertiaryLabelColor] range:whitespaceRange];
+        NSUInteger rangeEnd = NSMaxRange(whitespaceRange);
+        if (rangeEnd >= menuAttributes.length) {
+            break;
+        }
+        whitespaceRange = [string rangeOfCharacterFromSet:spechial options:0 range:NSMakeRange(rangeEnd, menuAttributes.length - rangeEnd)];
     }
-    [self resetDisplayString];
+    return menuAttributes;
 }
 
--(void) setContents:(NSString *)newContents
+- (void) resetDisplayStrings
 {
-    [newContents retain];
-    [clipContents release];
-    clipContents = newContents;
-    [self resetDisplayString];
-}
-
--(void) setType:(NSString *)newType
-{
-    [newType retain];
-    [clipType release];
-    clipType = newType;
-}
-
--(void) setDisplayLength:(int)newDisplayLength
-{
-    if ( newDisplayLength  > 0 ) {
-        clipDisplayLength = newDisplayLength;
-        [self resetDisplayString];
-    }
-}
-
--(void) setHasName:(BOOL)newHasName
-{
-    clipHasName = newHasName;
-}
-
--(void) resetDisplayString
-{
-    NSString *newDisplayString, *trimmedString, *firstLineOfClipping;
-    unsigned long start, lineEnd, contentsEnd;
-    NSRange startRange = NSMakeRange(0,0);
-    NSRange contentsRange;
+    // unsigned long start, lineEnd, contentsEnd;
+    // NSRange startRange = NSMakeRange(0,0);
+    // NSRange contentsRange;
     // We're resetting the display string, so release the old one.
-    [clipDisplayString release];
     // We want to restrict the display string to the clipping contents through the first line break.
-    trimmedString = [clipContents stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    [trimmedString getLineStart:&start end:&lineEnd contentsEnd:&contentsEnd forRange:startRange];
-    contentsRange = NSMakeRange(0, contentsEnd);
-    firstLineOfClipping = [trimmedString substringWithRange:contentsRange];
-    if ( [firstLineOfClipping length] > clipDisplayLength ) {
-        newDisplayString = [[NSString stringWithString:[firstLineOfClipping substringToIndex:clipDisplayLength]] stringByAppendingString:@"…"];
+    NSString *menuString = _contents;
+    if ( [menuString length] > _DISPLENGTH ) {
+        menuString = [[NSString stringWithString:[menuString substringToIndex:_DISPLENGTH]] stringByAppendingString:@"…"];
     } else {
-        newDisplayString = [NSString stringWithString:firstLineOfClipping];
+        menuString = [NSString stringWithString:menuString];
     }
-    [newDisplayString retain];
-    clipDisplayString = newDisplayString;
+    _menuAttributedString = [self replaceNewlinesAndTabs:menuString];
+    _listAttributedString = [self replaceNewlinesAndTabs:_contents];
 }
 
--(NSString *) description
+
+- (NSString *) description
 {
     NSString *description = [[super description] stringByAppendingString:@": "];
-    description = [description stringByAppendingString:[self displayString]];
+    description = [description stringByAppendingString:self.menuAttributedString.string];
     return description;
 }
 
--(NSString *) contents
-{
-    //    NSString *returnClipContents;
-    //    returnClipContents = [NSString stringWithString:clipContents];
-    //    return returnClipContents;
-    return clipContents;
-}
-
--(int) displayLength
-{
-    return clipDisplayLength;
-}
-
--(NSString *) type
-{
-    return clipType;
-}
-
--(NSString *) displayString
-{
-    // QUESTION
-    // Why doesn't the below work?
-    // NSString *returnClipDisplayString;
-    // returnClipDisplayString = [NSString stringWithString:clipDisplayString];
-    // return returnClipDisplayString;
-    return clipDisplayString;
-}
-
--(BOOL) hasName
-{
-    return clipHasName;
-}
-
--(void) dealloc
-{
-    [clipContents release];
-    [clipType release];
-    clipDisplayLength = 0;
-    [clipDisplayString release];
-    clipHasName = 0;
-    [super dealloc];
-}
 @end

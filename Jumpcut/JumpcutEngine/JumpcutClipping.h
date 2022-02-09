@@ -24,42 +24,17 @@
 //  THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#import <Foundation/Foundation.h>
+#import <Cocoa/Cocoa.h>
 
-@interface JumpcutClipping : NSObject {
-// What must a clipping hold?
-// The text
-    NSString * clipContents;
-// The text type
-    NSString * clipType;
-// The display length
-    int clipDisplayLength;
-// The display string
-    NSString * clipDisplayString;
-// Does it have a name?
-    BOOL clipHasName;
-}
+@interface JumpcutClipping : NSObject
 
--(id) initWithContents:(NSString *)contents withType:(NSString *)type withDisplayLength:(int)displayLength;
-/* -(id) initWithCoder:(NSCoder *)coder;
--(void) decodeWithCoder:(NSCoder *)coder; */
--(NSString *) description;
-
-// set values
--(void) setContents:(NSString *)newContents setDisplayLength:(int)newDisplayLength;
--(void) setContents:(NSString *)newContents;
--(void) setType:(NSString *)newType;
--(void) setDisplayLength:(int)newDisplayLength;
--(void) setHasName:(BOOL)newHasName;
+-(id) initWithContents:(NSString *)contents withType:(NSString *)type;
 
 // Retrieve values
--(NSString *) contents;
--(int) displayLength;
--(NSString *) displayString;
--(NSString *) type;
--(BOOL) hasName;
-
-// Additional functions
--(void) resetDisplayString;
+@property (strong, nonatomic) NSString *contents;
+@property (strong, nonatomic) NSString *menuString;
+@property (readonly, nonatomic) NSAttributedString *menuAttributedString;
+@property (readonly, nonatomic) NSAttributedString *listAttributedString;
+@property (strong, nonatomic) NSString *type;
 
 @end

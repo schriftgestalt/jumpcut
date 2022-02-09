@@ -12,10 +12,10 @@
 #import <ShortcutRecorder/SRCommon.h>
 #import <ShortcutRecorder/SRRecorderControl.h>
 
-@interface AppDelegate : NSObject <NSApplicationDelegate>
+@interface AppDelegate : NSObject <NSApplicationDelegate, NSTableViewDataSource, NSWindowDelegate>
 @property (strong, nonatomic) IBOutlet NSMenu *statusMenu;
-@property (assign) IBOutlet NSWindow *prefsPanel;
-@property (assign) IBOutlet NSSegmentedControl *launchAtLoginButton;
+@property (weak) IBOutlet NSWindow *prefsPanel;
+@property (weak) IBOutlet NSSegmentedControl *launchAtLoginButton;
 
 // Preference related
 -(IBAction) showPreferencePanel:(id)sender;

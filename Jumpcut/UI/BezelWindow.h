@@ -9,36 +9,7 @@
 //  at <http://jumpcut.sourceforge.net/> for details.
 
 #import <Cocoa/Cocoa.h>
-#import "RoundRecBezierPath.h"
-#import "RoundRecTextField.h"
 
-#if (MAC_OS_X_VERSION_MAX_ALLOWED < 101200) && !defined(JUMPCUT_DONT_MAP_10_12_ENUMS)
-#define NSWindowStyleMaskBorderless NSBorderlessWindowMask
-#define NSEventModifierFlagCommand NSCommandKeyMask
-#endif
-
-@interface BezelWindow : NSWindow {
-	NSString			*charString; // Slightly misleading, as this can be longer than one character
-	NSString			*title;
-	NSString			*bezelText;
-	NSImage				*icon;
-	RoundRecTextField	*textField;
-	RoundRecTextField	*charField;
-	NSImageView			*iconView;
-	id					delegate;
-}
-
-- (NSColor *)roundedBackgroundWithRect:(NSRect)bgRect withRadius:(float)radius withAlpha:(float)alpha;
-- (NSColor *)sizedBezelBackgroundWithRadius:(float)radius withAlpha:(float)alpha;
-
-- (NSString *)title;
-- (void)setTitle:(NSString *)newTitle;
-- (NSString *)text;
-- (void)setText:(NSString *)newText;
-- (void)setCharString:(NSString *)newChar;
-- (void)setAlpha:(float)newValue;
-
-- (id)delegate;
-- (void)setDelegate:(id)newDelegate;
+@interface BezelWindow : NSWindow
 
 @end

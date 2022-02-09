@@ -35,49 +35,30 @@
 
 #import <Foundation/Foundation.h>
 
-@interface JumpcutStore : NSObject {
+@class JumpcutClipping;
 
-    // Our various listener-related preferences
-    int jcRememberNum;		// The max we will allow users to display; 20
-    int jcDisplayNum;		// How many the user actually wants to display; defaults to 10
-    int jcDisplayLen;		// How many characters to display in the menu; defaults to 37
-    
-    // hash -- key values to clippings
-    // initially we will use PasteboardCount as the key value, but this will not be guaranteed
-    // to be unique once we allow for saving. Instead, we should use seconds since day 0 or some such.
-    // NSMutableDictionary * jcClippings;
+@interface JumpcutStore : NSObject
 
-    // array -- stores key values for the last jcRememberNum text pasteboard items
-    NSMutableArray *jcList;
-}
+@property (strong) NSMutableArray <JumpcutClipping *> *clippings;
 
--(id) initRemembering:(int)nowRemembering
-        displaying:(int)nowDisplaying
-        withDisplayLength:(int)displayLength;
+// Our various listener-related preferences
+@property (nonatomic) NSUInteger rememberNum;
+@property (nonatomic) NSUInteger displayNum;
+@property (readonly) NSUInteger countOfClippings;
 
-// Set various values
--(void) setRememberNum:(int)nowRemembering;
--(void) setDisplayNum:(int)nowDisplaying;
--(void) setDisplayLen:(int)newDisplayLength;
-
-// Retrieve various values
--(int) displayLen;
--(int) remembering;
--(int) jcListCount;
--(NSString *) clippingContentsAtPosition:(int)index;
--(NSString *) clippingDisplayStringAtPosition:(int)index;
--(NSString *) clippingTypeAtPosition:(int)index;
--(NSArray *) previousContents:(int)howMany;
--(NSArray *) previousDisplayStrings:(int)howMany;
+-(NSString *) clippingContentsAtIndex:(NSUInteger)index;
+-(NSAttributedString *) clippingDisplayStringAtIndex:(NSUInteger)index;
+-(NSString *) clippingTypeAtIndex:(NSUInteger)index;
 
 // Add a clipping
 -(void) addClipping:(NSString *)clipping ofType:(NSString *)type;
 
 // Delete a clipping -- falsifiable
--(bool) removeClippingAtPosition:(int)position;
+-(bool) removeClippingAtIndex:(NSUInteger)index;
 
 // Delete all list clippings
 -(void) clearList;
 
-// Delete all named clippings
+-(NSArray *) previousDisplayStrings:(NSUInteger)howMany;
+
 @end

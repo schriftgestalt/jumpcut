@@ -10,16 +10,18 @@
 #import <ServiceManagement/ServiceManagement.h>
 #import <ShortcutRecorder/ShortcutRecorder.h>
 #import <Sparkle/Sparkle.h>
+#import "BezelTableRowView.h"
 
-#define _DISPLENGTH 40
 #define _MAX_REMEMBER 99
 #define _MIN_REMEMBER 10
 #define _MAX_DISPLAY 40
 
 @interface AppDelegate ()
-@property BezelWindow *bezel;
-@property JumpcutStore *clippingStore;
-@property (assign) IBOutlet SRRecorderControl *hotkeyRecorder;
+
+@property (weak) IBOutlet NSWindow *bezel;
+@property (weak) IBOutlet NSTableView *clipsList;
+@property (strong) JumpcutStore *clippingStore;
+@property (strong) IBOutlet SRRecorderControl *hotkeyRecorder;
 @property BOOL isBezelDisplayed;
 @property BOOL isBezelPinned;
 @property BOOL issuedRememberResizeWarning;
@@ -28,13 +30,12 @@
 @property BOOL showManualAccessibilityWarning;
 @property (nonatomic, strong) NSArray *transientPasteboardTypes;
 @property (nonatomic, strong) NSArray *sensitivePasteboardTypes;
-@property NSPasteboard *jcPasteboard;
+@property (strong) NSPasteboard *jcPasteboard;
 @property unsigned int pbCount;
-@property SRKeyCodeTransformer *shortcutTransformer;
-@property signed int stackPosition;
-@property NSStatusItem *statusItem;
+@property (strong) SRKeyCodeTransformer *shortcutTransformer;
+@property (strong) NSStatusItem *statusItem;
 @property CGKeyCode veeCode;
-@property SRShortcutAction *mainHotkeyAction;
+@property (strong) SRShortcutAction *mainHotkeyAction;
 
 @end
 
@@ -44,7 +45,6 @@
 {
     [[NSUserDefaultsController sharedUserDefaultsController] removeObserver:self forKeyPath:@"values.mainHotkey"];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
-    [super dealloc];
 }
 
 - (id)init
@@ -73,8 +73,8 @@
     self.isBezelPinned = NO;
     self.pbCount = 0;
 
-    self.shortcutTransformer = [[[SRKeyCodeTransformer alloc] init] retain];
-    self.statusItem = [[NSStatusBar.systemStatusBar statusItemWithLength:NSVariableStatusItemLength] retain];
+    self.shortcutTransformer = [[SRKeyCodeTransformer alloc] init];
+    self.statusItem = [NSStatusBar.systemStatusBar statusItemWithLength:NSVariableStatusItemLength];
     if ( [[NSUserDefaults standardUserDefaults] integerForKey:@"menuIcon"] == 1 ) {
         self.statusItem.title = @"✂";
     } else if ( [[NSUserDefaults standardUserDefaults] integerForKey:@"menuIcon"] == 2 ) {
@@ -89,7 +89,7 @@
         [self.bezel setCollectionBehavior:NSWindowCollectionBehaviorTransient | NSWindowCollectionBehaviorIgnoresCycle | NSWindowCollectionBehaviorFullScreenAuxiliary | NSWindowCollectionBehaviorMoveToActiveSpace];
     }
     [self.bezel setHidesOnDeactivate: YES];
-    NSDictionary *trustedCheckOptions = @{(id)kAXTrustedCheckOptionPrompt: @YES};
+    NSDictionary *trustedCheckOptions = @{(__bridge id)kAXTrustedCheckOptionPrompt: @YES};
     self.hasAccessibility = AXIsProcessTrustedWithOptions((CFDictionaryRef)trustedCheckOptions);
     self.transientPasteboardTypes = @[
                             @"de.petermaurer.TransientPasteboardType",
@@ -111,7 +111,6 @@
                                                     @"Users upgrading from older versions of Jumpcut may need to remove Jumpcut from the Security & Privacy Preference's Accessibility tab and add it again manually in order to fix the \"Clipping Selection Pastes\" option. This should be a one-time fix.",
                                                     @"Alert panel - Accessibility upgrade warning - message")];
         [alert runModal];
-        [alert release];
     }
 }
 
@@ -227,23 +226,16 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
 
 - (void)awakeFromNib
 {
-    NSUserDefaultsController *defaults = [NSUserDefaultsController sharedUserDefaultsController];
-
-    // Set up the bezel window
-    NSSize windowSize = NSMakeSize(325.0, 325.0);
-    NSSize screenSize = [[NSScreen mainScreen] frame].size;
-    NSRect windowFrame = NSMakeRect( (screenSize.width - windowSize.width) / 2,
-                                    (screenSize.height - windowSize.height) / 3,
-                                    windowSize.width, windowSize.height );
-    self.bezel = [[BezelWindow alloc] initWithContentRect:windowFrame
-                                                styleMask:NSWindowStyleMaskBorderless
-                                                  backing:NSBackingStoreBuffered
-                                                    defer:NO];
-    [self.bezel setDelegate:self];
+    if (self.clippingStore) {
+        return;
+    }
+    NSUserDefaultsController *defaultsController = [NSUserDefaultsController sharedUserDefaultsController];
     // Initiate our store
-    self.clippingStore = [[JumpcutStore alloc] initRemembering:(int)[[NSUserDefaults standardUserDefaults] integerForKey:@"rememberNum"]
-                                                    displaying:(int)[[NSUserDefaults standardUserDefaults] integerForKey:@"displayNum"]
-                                             withDisplayLength:_DISPLENGTH];
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    self.clippingStore = [[JumpcutStore alloc] init];
+    self.clippingStore.rememberNum = [defaults integerForKey:@"rememberNum"];
+    self.clippingStore.displayNum = [defaults integerForKey:@"displayNum"];
+
     // If our preferences indicate that we are saving, load the dictionary from the saved plist
     // and use it to get everything set up.
     if ([[NSUserDefaults standardUserDefaults] integerForKey:@"savePreference"] >= 1) {
@@ -255,14 +247,14 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
                      toObject:defaults
                   withKeyPath:@"values.mainHotkey"
                       options:nil];
-    [defaults addObserver:self forKeyPath:@"values.mainHotkey" options:NSKeyValueObservingOptionInitial context:NULL];
+    [defaultsController addObserver:self forKeyPath:@"values.mainHotkey" options:NSKeyValueObservingOptionInitial context:NULL];
     // Build our listener
     [self.jcPasteboard declareTypes:[NSArray arrayWithObject:NSStringPboardType] owner:nil];
-    [[[NSTimer scheduledTimerWithTimeInterval:(1.0)
+    [[NSTimer scheduledTimerWithTimeInterval:(1.0)
                                        target:self
                                      selector:@selector(pollPasteboard:)
                                      userInfo:nil
-                                      repeats:YES] retain] fire];
+                                      repeats:YES] fire];
     // This should not run if SUHasLaunchedBefore is falsey -- we're going to ignore the interval for now.
     // If we choose to implement the interval, see:
     // https://github.com/Tunnelblick/Tunnelblick/blob/master/tunnelblick/MenuController.m
@@ -298,114 +290,65 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
 
 - (IBAction)hitMainHotkey:(id)aSender
 {
-    if ( ! self.isBezelDisplayed ) {
-        [NSApp activateIgnoringOtherApps:YES];
-        if ( [[NSUserDefaults standardUserDefaults] boolForKey:@"stickyBezel"] ) {
-            self.isBezelPinned = YES;
-        }
-        [self showBezel];
-    } else {
-        [self stackDown];
+    [NSApp activateIgnoringOtherApps:YES];
+    if ( [[NSUserDefaults standardUserDefaults] boolForKey:@"stickyBezel"] ) {
+        self.isBezelPinned = YES;
     }
+    [self showBezel];
 }
 
 - (void)updateMenu {
-    int passedSeparator = 0;
-    NSMenuItem *oldItem;
-    NSMenuItem *item;
-    NSString *pbMenuTitle;
-    NSArray *returnedDisplayStrings = [self.clippingStore previousDisplayStrings:(int)[[NSUserDefaults standardUserDefaults] integerForKey:@"displayNum"]];
-    NSEnumerator *menuEnumerator = [[self.statusMenu itemArray] reverseObjectEnumerator];
-    NSEnumerator *clipEnumerator = [returnedDisplayStrings reverseObjectEnumerator];
+
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSArray <NSAttributedString *> *returnedDisplayStrings = [self.clippingStore previousDisplayStrings:[defaults integerForKey:@"displayNum"]];
 
     //remove clippings from menu
-    while( oldItem = [menuEnumerator nextObject] ) {
-        if( [oldItem isSeparatorItem]) {
-            passedSeparator++;
-        } else if ( passedSeparator == 2 ) {
-            [self.statusMenu removeItem:oldItem];
+    while( self.statusMenu.itemArray.count > 0 ) {
+        NSMenuItem *oldItem = self.statusMenu.itemArray.firstObject;
+        if ( [oldItem isSeparatorItem] ) {
+            break;
         }
+        [self.statusMenu removeItem:oldItem];
     }
 
-    while( pbMenuTitle = [clipEnumerator nextObject] ) {
-        item = [[NSMenuItem alloc] initWithTitle:pbMenuTitle
-                                          action:@selector(processMenuClippingSelection:)
-                                   keyEquivalent:@""];
+    for (NSInteger idx = returnedDisplayStrings.count - 1; idx >= 0; idx--) {
+        NSAttributedString *pbMenuTitle = returnedDisplayStrings[idx];
+        NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:pbMenuTitle.string
+                                                      action:@selector(processMenuClippingSelection:)
+                                               keyEquivalent:@""];
+        item.attributedTitle = pbMenuTitle;
         [item setTarget:self];
         [item setEnabled:YES];
+        item.tag = idx;
         [self.statusMenu insertItem:item atIndex:0];
-        // Way back in 0.2, failure to release the new item here was causing a quite atrocious memory leak.
-        [item release];
     }
 }
 
 /* Bezel handler */
 - (void) showBezel
 {
-    if ( [self.clippingStore jcListCount] > 0 && [self.clippingStore jcListCount] > self.stackPosition ) {
-        [self.bezel setCharString:[NSString stringWithFormat:@"%d", self.stackPosition + 1]];
-        [self.bezel setText:[self.clippingStore clippingContentsAtPosition:self.stackPosition]];
-    }
+    [self.clipsList reloadData];
+    [self.clipsList selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
     [self.bezel makeKeyAndOrderFront:nil];
     self.isBezelDisplayed = YES;
 }
 
--(void)hideApp
+-(void) hideApp
 {
     [self hideBezel];
     self.isBezelPinned = NO;
     [NSApp hide:self];
 }
 
-- (void) hideBezel
-{
-    [self.bezel orderOut:nil];
-    [self.bezel setCharString:@""];
+- (void)windowWillClose:(NSNotification *)notification {
     self.isBezelDisplayed = NO;
 }
 
--(void) stackUp
+- (void) hideBezel
 {
-    int count = [self.clippingStore jcListCount];
-    if ( count == 0 ) {
-        return;
-    }
-    self.stackPosition--;
-    if ( self.stackPosition < 0 ) {
-        self.stackPosition = 0;
-        if ( [[NSUserDefaults standardUserDefaults] boolForKey:@"wraparoundBezel"] ) {
-            self.stackPosition = count - 1;
-            [self.bezel setCharString:[NSString stringWithFormat:@"%d", self.stackPosition + 1]];
-            [self.bezel setText:[self.clippingStore clippingContentsAtPosition:self.stackPosition]];
-        } else {
-            self.stackPosition = 0;
-        }
-    }
-    if ( count > self.stackPosition ) {
-        [self.bezel setCharString:[NSString stringWithFormat:@"%d", self.stackPosition + 1]];
-        [self.bezel setText:[self.clippingStore clippingContentsAtPosition:self.stackPosition]];
-    }
-}
-
--(void) stackDown
-{
-    int count = [self.clippingStore jcListCount];
-    if ( count == 0 ) {
-        return;
-    }
-    self.stackPosition++;
-    if ( count > self.stackPosition ) {
-        [self.bezel setCharString:[NSString stringWithFormat:@"%d", self.stackPosition + 1]];
-        [self.bezel setText:[self.clippingStore clippingContentsAtPosition:self.stackPosition]];
-    } else {
-        if ( [[NSUserDefaults standardUserDefaults] boolForKey:@"wraparoundBezel"] ) {
-            self.stackPosition = 0;
-            [self.bezel setCharString:[NSString stringWithFormat:@"%d", 1]];
-            [self.bezel setText:[self.clippingStore clippingContentsAtPosition:self.stackPosition]];
-        } else {
-            self.stackPosition--;
-        }
-    }
+    [self.bezel orderOut:nil];
+    //[self.bezel setCharString:@""];
+    self.isBezelDisplayed = NO;
 }
 
 - (void)loadEngineFromPList {
@@ -436,7 +379,6 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
         }
 
         [self updateMenu];
-        [loadDict release];
     }
 }
 
@@ -461,14 +403,12 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
     [saveDict setObject:@"0.7" forKey:@"version"];
     [saveDict setObject:[NSNumber numberWithInt:(int)[[NSUserDefaults standardUserDefaults] integerForKey:@"rememberNum"]]
                  forKey:@"rememberNum"];
-    [saveDict setObject:[NSNumber numberWithInt:_DISPLENGTH]
-                 forKey:@"displayLen"];
     [saveDict setObject:[NSNumber numberWithInt:(int)[[NSUserDefaults standardUserDefaults] integerForKey:@"displayNum"]]
                  forKey:@"displayNum"];
-    for ( i = 0 ; i < [self.clippingStore jcListCount]; i++) {
+    for ( i = 0 ; i < self.clippingStore.countOfClippings; i++) {
         [jcListArray addObject:[NSDictionary dictionaryWithObjectsAndKeys:
-                                [self.clippingStore clippingContentsAtPosition:i], @"Contents",
-                                [self.clippingStore clippingTypeAtPosition:i], @"Type",
+                                [self.clippingStore clippingContentsAtIndex:i], @"Contents",
+                                [self.clippingStore clippingTypeAtIndex:i], @"Type",
                                 [NSNumber numberWithInt:i], @"Position",
                                 nil
                                 ]
@@ -480,11 +420,11 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
 
 /* Pasteboard and clipping behavior */
 
--(BOOL)addClipToPasteboardFromCount:(int)indexInt movingToTop:(bool)moveBool
+-(BOOL)addClipToPasteboardFromCount:(NSUInteger)indexInt movingToTop:(bool)moveBool
 {
     NSString *pbFullText;
     NSArray *pbTypes;
-    if ( (indexInt + 1) > [self.clippingStore jcListCount] ) {
+    if ( (indexInt + 1) > self.clippingStore.countOfClippings ) {
         // We're asking for a clipping that isn't there yet
         // This only tends to happen immediately on startup when not saving, as the entire list is empty.
         NSLog(@"Out of bounds request to jcList ignored.");
@@ -503,21 +443,21 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
 }
 
 -(BOOL) isValidClippingNumber:(NSNumber *)number {
-    return ( ([number intValue] + 1) <= [self.clippingStore jcListCount] );
+    return ( ([number intValue] + 1) <= self.clippingStore.countOfClippings );
 }
 
--(NSString *) clippingStringWithCount:(int)count {
-    if ( [self isValidClippingNumber:[NSNumber numberWithInt:count]] ) {
-        return [self.clippingStore clippingContentsAtPosition:count];
+-(NSString *) clippingStringWithCount:(NSUInteger)count {
+    if ( [self isValidClippingNumber:[NSNumber numberWithInteger:count]] ) {
+        return [self.clippingStore clippingContentsAtIndex:count];
     } else { // It fails -- we shouldn't be passed this, but...
-        NSLog(@"Asked for non-existant clipping count: %d", count);
+        NSLog(@"Asked for non-existant clipping count: %ld", count);
         return @"";
     }
 }
 
 -(IBAction)processMenuClippingSelection:(id)sender
 {
-    int index=(int)[[sender menu] indexOfItem:sender];
+    NSUInteger index = [sender tag];
     if ( [[NSUserDefaults standardUserDefaults] boolForKey:@"menuSelectionMovesToTop"] ) {
         [self addClipToPasteboardFromCount:index movingToTop:YES];
     } else {
@@ -535,82 +475,22 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
     // AppControl should only be getting these directly from bezel via delegation
     if ( [theEvent type] == NSEventTypeKeyDown )
     {
-        // Note that we want to accept as a "stack down" or "stack up"
-        // move the underlying key and shift-key, even if not all the flags
-        // are correct.
-        if ( theEvent.keyCode == [self.hotkeyRecorder.objectValue[@"keyCode"] integerValue])
-        {
-            if ( [theEvent modifierFlags] & NSEventModifierFlagShift )
-            {
-                [self stackUp];
-            } else {
-                [self stackDown];
-            }
-            return;
-        }
         unichar pressed = [[theEvent charactersIgnoringModifiers] characterAtIndex:0];
         switch ( pressed ) {
             case 0x1B:
                 [self hideApp];
                 break;
-            case 0x3: case 0xD: // Enter or Return
+            case '\n':
+            case '\r': // Enter or Return
                 [self pasteFromStack];
                 break;
-            case NSUpArrowFunctionKey:
-            case NSLeftArrowFunctionKey:
-                [self stackUp];
-                break;
-            case NSDownArrowFunctionKey:
-            case NSRightArrowFunctionKey:
-                [self stackDown];
-                break;
-            case NSHomeFunctionKey:
-                if ( [self.clippingStore jcListCount] > 0 ) {
-                    self.stackPosition = 0;
-                    [self.bezel setCharString:[NSString stringWithFormat:@"%d", self.stackPosition + 1]];
-                    [self.bezel setText:[self.clippingStore clippingContentsAtPosition:self.stackPosition]];
-                }
-                break;
-            case NSEndFunctionKey:
-                if ( [self.clippingStore jcListCount] > 0 ) {
-                    self.stackPosition = [self.clippingStore jcListCount] - 1;
-                    [self.bezel setCharString:[NSString stringWithFormat:@"%d", self.stackPosition + 1]];
-                    [self.bezel setText:[self.clippingStore clippingContentsAtPosition:self.stackPosition]];
-                }
-                break;
-            case NSPageUpFunctionKey:
-                if ( [self.clippingStore jcListCount] > 0 ) {
-                    self.stackPosition = self.stackPosition - 10; if ( self.stackPosition < 0 ) self.stackPosition = 0;
-                    [self.bezel setCharString:[NSString stringWithFormat:@"%d", self.stackPosition + 1]];
-                    [self.bezel setText:[self.clippingStore clippingContentsAtPosition:self.stackPosition]];
-                }
-                break;
-            case NSPageDownFunctionKey:
-                if ( [self.clippingStore jcListCount] > 0 ) {
-                    self.stackPosition = self.stackPosition + 10; if ( self.stackPosition >= [self.clippingStore jcListCount] ) self.stackPosition = [self.clippingStore jcListCount] - 1;
-                    [self.bezel setCharString:[NSString stringWithFormat:@"%d", self.stackPosition + 1]];
-                    [self.bezel setText:[self.clippingStore clippingContentsAtPosition:self.stackPosition]];
-                }
-                break;
+
             case NSBackspaceCharacter:
             case NSDeleteCharacter:
             case NSDeleteFunctionKey:
                 // Delete what's on the stack (if anything)
-                if ([self.clippingStore removeClippingAtPosition:self.stackPosition]) {
-                    // If there's anything left on the stackstack, move down
-                    if ([self.clippingStore jcListCount] == 0) {
-                        [self.bezel setCharString:@""];
-                        [self.bezel setText:@""];
-                        self.stackPosition = 0;
-                    } else {
-                        if ( self.stackPosition > [self.clippingStore jcListCount] ) {
-                            self.stackPosition = [self.clippingStore jcListCount] - 1;
-                        } else if ( self.stackPosition == [self.clippingStore jcListCount] ) {
-                            self.stackPosition = self.stackPosition - 1;
-                        }
-                        [self.bezel setCharString:[NSString stringWithFormat:@"%d", self.stackPosition + 1]];
-                        [self.bezel setText:[self.clippingStore clippingContentsAtPosition:self.stackPosition]];
-                    }
+                if ([self.clippingStore removeClippingAtIndex:self.clipsList.selectedRow]) {
+                    [self.clipsList reloadData];
                     [self updateMenu];
                 }
                 break;
@@ -619,10 +499,8 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
                 // We'll currently ignore the possibility that the user wants to do something with shift.
                 // First, let's set the new stack count to "10" if the user pressed "0"
                 newStackPosition = pressed == 0x30 ? 9 : [[NSString stringWithCharacters:&pressed length:1] intValue] - 1;
-                if ( [self.clippingStore jcListCount] >= newStackPosition ) {
-                    self.stackPosition = newStackPosition;
-                    [self.bezel setCharString:[NSString stringWithFormat:@"%d", self.stackPosition + 1]];
-                    [self.bezel setText:[self.clippingStore clippingContentsAtPosition:self.stackPosition]];
+                if ( self.clippingStore.countOfClippings >= newStackPosition ) {
+                    [self.clipsList selectRowIndexes:[NSIndexSet indexSetWithIndex:newStackPosition] byExtendingSelection:NO];
                 }
                 break;
             default: // It's not a navigation/application-defined thing, so let's figure out what to do with it.
@@ -635,10 +513,10 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
 
 - (void)pasteFromStack
 {
-    int count = [self.clippingStore jcListCount];
+    NSUInteger count = self.clippingStore.countOfClippings;
     [self performSelector:@selector(hideApp) withObject:nil afterDelay:0.2];
-    if ( count && count > self.stackPosition ) {
-        [self addClipToPasteboardFromCount:self.stackPosition movingToTop:NO];
+    if ( count && count > self.clipsList.selectedRow ) {
+        [self addClipToPasteboardFromCount:self.clipsList.selectedRow movingToTop:NO];
         if ( [[NSUserDefaults standardUserDefaults] boolForKey:@"bezelSelectionPastes"] ) {
             [self performSelector:@selector(fakeCommandV) withObject:nil afterDelay:0.2];
         }
@@ -715,15 +593,15 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
             if ([[self.jcPasteboard stringForType:@"net.sf.jumpcut.internal"] isEqual:@"1"]) {
                 return;
             }
-            if ([self.clippingStore jcListCount] > 0 && [contents isEqualToString:[self.clippingStore clippingContentsAtPosition:0]]) {
+            if (self.clippingStore.countOfClippings > 0 && [contents isEqualToString:[self.clippingStore clippingContentsAtIndex:0]]) {
                 return;
             }
             // We've made it through our battery of tests.
             [self.clippingStore addClipping:contents
                                      ofType:type    ];
             // The below tracks our position down down down... Maybe as an option?
-            // if ( [clippingStore jcListCount] > 1 ) stackPosition++;
-            self.stackPosition = 0;
+            // if ( clippingStore.countOfClippings > 1 ) stackPosition++;
+            //self.stackPosition = 0;
             [self updateMenu];
             if ( [[NSUserDefaults standardUserDefaults] integerForKey:@"savePreference"] >= 2 ) {
                 [self saveEngine];
@@ -739,7 +617,7 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
     if ( [[NSUserDefaults standardUserDefaults] integerForKey:@"savePreference"] >= 1 ) {
         [self saveEngine];
     }
-    [self.bezel setText:@""];
+    [self.clipsList reloadData];
 }
 
 -(IBAction)clearClippingList:(id)sender {
@@ -760,7 +638,6 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
             [self clearClippings];
             [[NSUserDefaults standardUserDefaults] setValue:[NSNumber numberWithBool:NO] forKey:@"askBeforeClearingClippings"];
         }
-        [alert release];
     } else {
         [self clearClippings];
     }
@@ -773,7 +650,7 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
     [NSApp activateIgnoringOtherApps: YES];
     // Double-check the status of our accessibility preferences before displaying the preference
     // window, so we can provide instructions if needed.
-    NSDictionary *trustedCheckOptions = @{(id)kAXTrustedCheckOptionPrompt: @NO};
+    NSDictionary *trustedCheckOptions = @{(__bridge id)kAXTrustedCheckOptionPrompt: @NO};
     self.hasAccessibility = AXIsProcessTrustedWithOptions((CFDictionaryRef)trustedCheckOptions);
     [self.prefsPanel makeKeyAndOrderFront:self];
     self.issuedRememberResizeWarning = NO;
@@ -827,7 +704,7 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
     if (newRemember < _MIN_REMEMBER) {
         newRemember = _MIN_REMEMBER;
     }
-    if ( newRemember < [self.clippingStore jcListCount] && (!self.issuedRememberResizeWarning && !self.stifleRememberResizeWarning)) {
+    if ( newRemember < self.clippingStore.countOfClippings && (!self.issuedRememberResizeWarning && !self.stifleRememberResizeWarning)) {
         long choice;
         NSAlert *alert = [[NSAlert alloc] init];
         [alert setInformativeText:NSLocalizedString(
@@ -846,8 +723,8 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
             self.stifleRememberResizeWarning = YES;
             [self setRememberNumPref:newRemember];
         } else if ( choice == NSAlertSecondButtonReturn ) {
-            [[NSUserDefaults standardUserDefaults] setValue:[NSNumber numberWithInt:[self.clippingStore remembering]]
-                                                     forKey:@"rememberNum"];
+            [[NSUserDefaults standardUserDefaults] setInteger:self.clippingStore.rememberNum
+                                                       forKey:@"rememberNum"];
             self.issuedRememberResizeWarning = NO;
         } else if ( choice == NSAlertFirstButtonReturn ) {
             [self setRememberNumPref:newRemember];
@@ -861,9 +738,9 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
     [[NSUserDefaults standardUserDefaults] setValue:[NSNumber numberWithInt:newPref]
                                              forKey:@"rememberNum"];
     [self.clippingStore setRememberNum:newPref];
-    if (self.stackPosition >= newPref) {
+    if (self.clipsList.selectedRow >= newPref) {
         // We have a lower bound of _MIN_REMEMBER from the caller.
-        self.stackPosition = newPref - 1;
+        [self.clipsList selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
     }
     [self updateMenu];
 }
@@ -906,6 +783,22 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
                                                              @"askBeforeClearingClippings",
                                                              nil]
      ];
+}
+
+#pragma mark Clip List datasource
+- (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
+    NSUInteger count = self.clippingStore.countOfClippings;
+    return count;
+}
+
+- (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
+    return [self.clippingStore clippingDisplayStringAtIndex:row];
+}
+
+- (NSTableRowView *)tableView:(NSTableView *)tableView rowViewForRow:(NSInteger)row
+{
+    BezelTableRowView *rowView = [BezelTableRowView new];
+    return rowView;
 }
 
 @end
