@@ -119,6 +119,10 @@
     }
     _menuAttributedString = [self replaceNewlinesAndTabs:menuString];
     _listAttributedString = [self replaceNewlinesAndTabs:_contents];
+    NSMutableParagraphStyle *textParagraph = [[NSMutableParagraphStyle alloc] init];
+    [textParagraph setLineSpacing:6];
+    [(NSMutableAttributedString *)_listAttributedString addAttribute:NSParagraphStyleAttributeName value:textParagraph range:NSMakeRange(0, _listAttributedString.length)];
+
 }
 
 
