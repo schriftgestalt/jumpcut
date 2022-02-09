@@ -40,6 +40,10 @@
         [visualEffect.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:0].active = YES;
         [visualEffect.topAnchor constraintEqualToAnchor:contentView.topAnchor constant:0].active = YES;
         [visualEffect.bottomAnchor constraintEqualToAnchor:contentView.bottomAnchor constant:0].active = YES;
+
+        if (@available(macOS 11, *)) { // to account for the offset in the tableview.
+            self.topConstraint.constant = 10;
+        }
         _hasSetup = YES;
     };
 }

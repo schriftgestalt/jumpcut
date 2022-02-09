@@ -13,13 +13,13 @@
 - (void)drawSelectionInRect:(NSRect)dirtyRect {
     NSBezierPath *bezierPath = [NSBezierPath bezierPathWithRoundedRect:self.bounds xRadius:8 yRadius:8];
     if (@available(macOS 10.14, *)) {
-        [[NSColor tertiaryLabelColor] set];
+        [[NSColor controlAccentColor] set];
     }
     else {
         [[NSColor colorWithDeviceRed:8.0 / 255.0
                                green:109.0 / 255.0
                                 blue:214.0 / 255.0
-                               alpha:0.5] set];
+                               alpha:1] set];
     }
     [bezierPath fill];
 }

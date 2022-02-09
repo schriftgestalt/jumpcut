@@ -611,6 +611,7 @@
             </view>
             <connections>
                 <outlet property="delegate" destination="Voe-Tx-rLC" id="H7S-j4-ItU"/>
+                <outlet property="topConstraint" destination="gl7-e2-Zzt" id="Zro-Qd-TUW"/>
             </connections>
             <point key="canvasLocation" x="-146" y="280.5"/>
         </window>

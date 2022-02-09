@@ -12,4 +12,6 @@
 
 @interface BezelWindow : NSWindow
 
+@property (weak) IBOutlet NSLayoutConstraint *topConstraint;
+
 @end
