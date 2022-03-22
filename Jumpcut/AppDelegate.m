@@ -238,10 +238,10 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
 
     // If our preferences indicate that we are saving, load the dictionary from the saved plist
     // and use it to get everything set up.
-    if ([[NSUserDefaults standardUserDefaults] integerForKey:@"savePreference"] >= 1) {
+    if ([defaults integerForKey:@"savePreference"] >= 1) {
         [self loadEngineFromPList];
     }
-
+    NSParameterAssert(self.hotkeyRecorder);
     // Set up the hotkey and hotkey observer
     [self.hotkeyRecorder bind:NSValueBinding
                      toObject:defaultsController
@@ -258,10 +258,10 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
     // This should not run if SUHasLaunchedBefore is falsey -- we're going to ignore the interval for now.
     // If we choose to implement the interval, see:
     // https://github.com/Tunnelblick/Tunnelblick/blob/master/tunnelblick/MenuController.m
-    if ([[SUUpdater sharedUpdater] automaticallyChecksForUpdates] && [[NSUserDefaults standardUserDefaults] boolForKey:@"SUHasLaunchedBefore"]) {
+    if ([[SUUpdater sharedUpdater] automaticallyChecksForUpdates] && [defaults boolForKey:@"SUHasLaunchedBefore"]) {
         [[SUUpdater sharedUpdater] checkForUpdatesInBackground];
     } else {
-        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"SUHasLaunchedBefore"];
+        [defaults setBool:YES forKey:@"SUHasLaunchedBefore"];
     }
 }
 
