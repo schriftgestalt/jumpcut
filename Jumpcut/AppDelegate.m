@@ -244,7 +244,7 @@ NSString* keyCodeToString(CGKeyCode keyCode) {
 
     // Set up the hotkey and hotkey observer
     [self.hotkeyRecorder bind:NSValueBinding
-                     toObject:defaults
+                     toObject:defaultsController
                   withKeyPath:@"values.mainHotkey"
                       options:nil];
     [defaultsController addObserver:self forKeyPath:@"values.mainHotkey" options:NSKeyValueObservingOptionInitial context:NULL];
