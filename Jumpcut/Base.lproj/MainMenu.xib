@@ -17,6 +17,7 @@
             <connections>
                 <outlet property="bezel" destination="BPc-d5-2Mc" id="7hh-II-fk5"/>
                 <outlet property="clipsList" destination="OUK-99-Beg" id="iXJ-6w-0Nn"/>
+                <outlet property="hotkeyRecorder" destination="DY1-5P-dbY" id="qLH-Io-3Br"/>
                 <outlet property="prefsPanel" destination="4ya-R8-y5l" id="bOi-ra-D0N"/>
                 <outlet property="statusMenu" destination="IyR-pm-o7v" id="wzD-T3-sOL"/>
             </connections>
